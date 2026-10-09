@@ -1,0 +1,43 @@
+<ng-content />
+
+@if (visible() && !disabled()) {
+  <div
+    class="hint-card shadow"
+    role="tooltip"
+    [id]="id"
+    [class.below]="position().below"
+    [style.top.px]="position().top"
+    [style.left.px]="position().left"
+  >
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <span class="hint-icon"><i class="bi {{ info().icon }}"></i></span>
+      <span class="fw-semibold">{{ info().title }}</span>
+    </div>
+
+    <p class="mb-2">{{ info().description }}</p>
+
+    <dl class="hint-list mb-0">
+      @if (info().column) {
+        <dt>Колонка</dt>
+        <dd>{{ info().column }}</dd>
+      }
+      @if (total() !== null) {
+        <dt>Значений</dt>
+        <dd>{{ total() }} в справочнике</dd>
+      }
+      @if (info().searchBy) {
+        <dt>Поиск</dt>
+        <dd>{{ info().searchBy }}</dd>
+      }
+      @if (info().logic) {
+        <dt>Логика</dt>
+        <dd>{{ info().logic }}</dd>
+      }
+    </dl>
+
+    <div class="hint-current">
+      <i class="bi bi-funnel me-1"></i>
+      {{ current() || 'Не задан — показываются все записи' }}
+    </div>
+  </div>
+}

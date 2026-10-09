@@ -1,0 +1,216 @@
+<div class="container py-4 edit-page">
+  <!-- Навигация -->
+  <nav aria-label="Навигация" class="mb-2">
+    <ol class="breadcrumb small mb-0">
+      <li class="breadcrumb-item"><a routerLink="/wagons">Вагоны</a></li>
+      <li class="breadcrumb-item active" aria-current="page">
+        {{ original() ? '№ ' + original()!.wagonNumber : 'Редактирование' }}
+      </li>
+    </ol>
+  </nav>
+
+  @if (loading()) {
+    <div class="card shadow-sm">
+      <div class="card-body d-flex align-items-center gap-2 text-body-secondary py-5 justify-content-center">
+        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+        Загрузка данных вагона…
+      </div>
+    </div>
+  } @else if (notFound()) {
+    <div class="card shadow-sm">
+      <div class="card-body text-center py-5">
+        <i class="bi bi-question-circle fs-2 text-body-secondary d-block mb-2"></i>
+        <h5>Вагон не найден</h5>
+        <p class="text-body-secondary">Возможно, ссылка устарела или вагон был удалён.</p>
+        <a class="btn btn-primary" routerLink="/wagons">К списку вагонов</a>
+      </div>
+    </div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <!-- Заголовок + действия -->
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <div class="me-auto">
+          <h4 class="mb-0">
+            Вагон <span class="font-monospace">№ {{ original()?.wagonNumber }}</span>
+          </h4>
+          <span class="small text-body-secondary">Запись #{{ original()?.id }}</span>
+        </div>
+        <a class="btn btn-outline-secondary" routerLink="/wagons">Отмена</a>
+        <button type="submit" class="btn btn-primary" [disabled]="saving() || !changedFields().length">
+          @if (saving()) {
+            <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Сохранение…
+          } @else {
+            <i class="bi bi-check2 me-1"></i>Сохранить
+          }
+        </button>
+      </div>
+
+      @if (saveError()) {
+        <div class="alert alert-danger d-flex align-items-center gap-2" role="alert">
+          <i class="bi bi-exclamation-triangle"></i>
+          Не удалось сохранить изменения. Попробуйте ещё раз.
+        </div>
+      }
+
+      @if (changedFields().length) {
+        <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2 py-2 small changes-bar" role="status">
+          <i class="bi bi-pencil"></i>
+          <span>
+            Изменено: <b>{{ changedLabels().join(', ') }}</b>
+          </span>
+          <button type="button" class="btn btn-sm btn-link ms-auto p-0" (click)="resetChanges()">
+            Отменить изменения
+          </button>
+        </div>
+      }
+
+      <div class="row g-3">
+        <!-- Идентификация -->
+        <div class="col-12 col-lg-6">
+          <section class="card shadow-sm h-100">
+            <div class="card-header bg-body fw-semibold"><i class="bi bi-upc-scan me-1"></i>Идентификация</div>
+            <div class="card-body d-flex flex-column gap-3">
+              <div>
+                <label class="form-label" for="wagonNumber" [class.changed]="isChanged('wagonNumber')">№ вагона</label>
+                <input
+                  id="wagonNumber"
+                  class="form-control font-monospace"
+                  formControlName="wagonNumber"
+                  inputmode="numeric"
+                  maxlength="8"
+                  autocomplete="off"
+                  [class.is-invalid]="showError('wagonNumber')"
+                />
+                <div class="invalid-feedback">8 цифр, например 56011036</div>
+              </div>
+              <div>
+                <label class="form-label" for="containerNumber" [class.changed]="isChanged('containerNumber')">№ контейнера</label>
+                <input
+                  id="containerNumber"
+                  class="form-control font-monospace"
+                  formControlName="containerNumber"
+                  autocomplete="off"
+                  (input)="normalizeContainer()"
+                  [class.is-invalid]="showError('containerNumber')"
+                />
+                <div class="invalid-feedback">4 латинские буквы и 7 цифр, например MSKU1234567</div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Состояние и груз -->
+        <div class="col-12 col-lg-6">
+          <section class="card shadow-sm h-100">
+            <div class="card-header bg-body fw-semibold"><i class="bi bi-box-seam me-1"></i>Состояние и груз</div>
+            <div class="card-body d-flex flex-column gap-3">
+              <div>
+                <label class="form-label" for="colorId" [class.changed]="isChanged('colorId')">Статус</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-body">
+                    <span class="swatch" [style.background]="selectedStatus()?.color"></span>
+                  </span>
+                  <select id="colorId" class="form-select" formControlName="colorId" [class.is-invalid]="showError('colorId')">
+                    @for (s of statuses; track s.id) {
+                      <option [ngValue]="s.id">{{ s.description }}</option>
+                    }
+                  </select>
+                </div>
+              </div>
+              <div class="row g-3">
+                <div class="col-7">
+                  <label class="form-label" for="nameId" [class.changed]="isChanged('nameId')">Тип контейнера</label>
+                  <select id="nameId" class="form-select" formControlName="nameId" [class.is-invalid]="showError('nameId')">
+                    @for (t of types; track t.id) {
+                      <option [ngValue]="t.id">{{ t.name }} — {{ t.description }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="col-5">
+                  <label class="form-label" for="weight" [class.changed]="isChanged('weight')">Вес, т</label>
+                  <input
+                    id="weight"
+                    type="number"
+                    class="form-control"
+                    formControlName="weight"
+                    min="0"
+                    max="40"
+                    step="0.1"
+                    [class.is-invalid]="showError('weight')"
+                  />
+                  <div class="invalid-feedback">От 0 до 40 т</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Принадлежность -->
+        <div class="col-12 col-lg-6">
+          <section class="card shadow-sm h-100">
+            <div class="card-header bg-body fw-semibold"><i class="bi bi-building me-1"></i>Принадлежность</div>
+            <div class="card-body d-flex flex-column gap-3">
+              <div>
+                <label class="form-label" for="ownerId" [class.changed]="isChanged('ownerId')">Собственник</label>
+                <select id="ownerId" class="form-select" formControlName="ownerId" [class.is-invalid]="showError('ownerId')">
+                  @for (o of owners; track o.id) {
+                    <option [ngValue]="o.id">{{ o.shortName }}</option>
+                  }
+                </select>
+                @if (selectedOwner(); as o) {
+                  <div class="form-text">{{ o.fullName }}</div>
+                }
+              </div>
+              <div>
+                <label class="form-label" for="operatorId" [class.changed]="isChanged('operatorId')">Оператор</label>
+                <select id="operatorId" class="form-select" formControlName="operatorId" [class.is-invalid]="showError('operatorId')">
+                  @for (o of operators; track o.id) {
+                    <option [ngValue]="o.id">{{ o.shortName }} · {{ o.code }}</option>
+                  }
+                </select>
+                @if (selectedOperator(); as o) {
+                  <div class="form-text">
+                    {{ o.fullName }}<br />
+                    Код: {{ o.code }} · Владелец: {{ o.owner }}
+                  </div>
+                }
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Перемещение -->
+        <div class="col-12 col-lg-6">
+          <section class="card shadow-sm h-100">
+            <div class="card-header bg-body fw-semibold"><i class="bi bi-geo-alt me-1"></i>Перемещение</div>
+            <div class="card-body d-flex flex-column gap-3">
+              <div>
+                <label class="form-label" for="station" [class.changed]="isChanged('station')">Станция</label>
+                <select id="station" class="form-select" formControlName="station" [class.is-invalid]="showError('station')">
+                  @for (s of stations; track s) {
+                    <option [ngValue]="s">{{ s }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="arrivalDate" [class.changed]="isChanged('arrivalDate')">Дата и время прибытия</label>
+                <input
+                  id="arrivalDate"
+                  type="datetime-local"
+                  class="form-control"
+                  formControlName="arrivalDate"
+                  [class.is-invalid]="showError('arrivalDate')"
+                />
+                <div class="invalid-feedback">Укажите дату и время</div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <p class="small text-body-secondary mt-3 mb-0">
+        <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>S</kbd> — сохранить. Изменённые поля отмечены точкой.
+      </p>
+    </form>
+  }
+</div>

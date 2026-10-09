@@ -1,0 +1,85 @@
+:host {
+  position: relative;
+  display: block;
+}
+
+.hint-card {
+  position: fixed;
+  z-index: 1060;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  padding: 0.75rem 0.875rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  background: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  pointer-events: none;
+  animation: hint-in 0.12s ease-out;
+}
+
+/* Стрелка к фильтру: слева, а если карточка под фильтром — сверху */
+.hint-card::before {
+  content: '';
+  position: absolute;
+  top: 1rem;
+  left: -6px;
+  width: 10px;
+  height: 10px;
+  background: inherit;
+  border-left: 1px solid var(--bs-border-color);
+  border-bottom: 1px solid var(--bs-border-color);
+  transform: rotate(45deg);
+}
+
+.hint-card.below::before {
+  top: -6px;
+  left: 1.25rem;
+  transform: rotate(135deg);
+}
+
+.hint-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.375rem;
+  background: var(--bs-primary-bg-subtle);
+  color: var(--bs-primary-text-emphasis);
+}
+
+.hint-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+}
+
+.hint-list dt {
+  font-weight: 400;
+  color: var(--bs-secondary-color);
+}
+
+.hint-list dd {
+  margin: 0;
+}
+
+.hint-current {
+  margin-top: 0.625rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--bs-border-color);
+  color: var(--bs-secondary-color);
+}
+
+@keyframes hint-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint-card {
+    animation: none;
+  }
+}

@@ -1,0 +1,589 @@
+<div class="container-fluid py-4 px-lg-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+      <h4 class="mb-0">Вагоны и контейнеры</h4>
+      <span class="text-body-secondary small">Всего записей: {{ totalCount() | number }}</span>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- Фильтры -->
+    <aside class="col-12 col-lg-4 col-xl-3">
+      <form
+        class="card shadow-sm filters"
+        [class.expanded]="filtersExpanded()"
+        (submit)="$event.preventDefault(); apply()"
+      >
+        <div class="card-header bg-body d-flex justify-content-between align-items-center gap-2">
+          <!-- На мобильных заголовок сворачивает/разворачивает панель -->
+          <button
+            type="button"
+            class="filters-toggle"
+            [attr.aria-expanded]="filtersExpanded()"
+            aria-controls="filtersBody"
+            (click)="filtersExpanded.set(!filtersExpanded())"
+          >
+            <i class="bi bi-sliders me-1"></i>Фильтры
+            @if (activeChips().length) {
+              <span class="badge rounded-pill text-bg-primary ms-1">{{
+                activeChips().length
+              }}</span>
+            }
+            @if (isDirty()) {
+              <span class="dirty-dot ms-1" title="Есть неприменённые изменения"></span>
+            }
+            <i class="bi bi-chevron-down chevron d-lg-none ms-1"></i>
+          </button>
+          <button
+            type="button"
+            class="btn btn-link btn-sm p-0 text-decoration-none"
+            [disabled]="!hasFilters()"
+            (click)="resetAll()"
+          >
+            Сбросить всё
+          </button>
+        </div>
+        <div id="filtersBody" class="card-body d-flex flex-column gap-3 filters-body">
+          <app-multi-select-filter
+            mode="inline"
+            title="Статус"
+            icon="bi-circle-half"
+            searchPlaceholder="Поиск по id или описанию"
+            [info]="filterInfo.status"
+            [options]="colorOptions()"
+            [selected]="draft().colorIds"
+            (selectedChange)="patchDraft({ colorIds: $event })"
+          />
+          <app-multi-select-filter
+            mode="inline"
+            title="Тип контейнера"
+            icon="bi-box"
+            [info]="filterInfo.type"
+            [options]="nameOptions()"
+            [selected]="draft().nameIds"
+            (selectedChange)="patchDraft({ nameIds: $event })"
+          />
+          <app-multi-select-filter
+            mode="inline"
+            title="Собственник"
+            icon="bi-building"
+            searchPlaceholder="Поиск по id, сокращённому или полному названию"
+            [info]="filterInfo.owner"
+            [options]="ownerOptions()"
+            [selected]="draft().ownerIds"
+            (selectedChange)="patchDraft({ ownerIds: $event })"
+          />
+          <app-multi-select-filter
+            mode="inline"
+            title="Оператор"
+            icon="bi-person-badge"
+            searchPlaceholder="Название, код компании или владелец"
+            [info]="filterInfo.operator"
+            [options]="operatorOptions()"
+            [selected]="draft().operatorIds"
+            (selectedChange)="patchDraft({ operatorIds: $event })"
+          />
+
+          <!-- Дата прибытия -->
+          <app-filter-hint [info]="filterInfo.date" [current]="dateHintText()">
+            <fieldset class="date-box">
+              <legend class="small text-body-secondary mb-2">
+                <i class="bi bi-calendar3 me-1"></i>Дата прибытия
+              </legend>
+              <div class="d-flex flex-wrap gap-1 mb-2">
+                @for (p of datePresets; track p.label) {
+                  <button
+                    type="button"
+                    class="btn btn-sm preset"
+                    [class.btn-primary]="isPresetActive(p)"
+                    [class.btn-outline-secondary]="!isPresetActive(p)"
+                    (click)="applyPreset(p)"
+                  >
+                    {{ p.label }}
+                  </button>
+                }
+              </div>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label small text-body-secondary mb-1" for="dateFrom">С</label>
+                  <input
+                    #from
+                    id="dateFrom"
+                    type="date"
+                    class="form-control form-control-sm"
+                    [class.is-invalid]="dateRangeInvalid()"
+                    [value]="draft().dateFrom"
+                    [max]="draft().dateTo"
+                    (change)="patchDraft({ dateFrom: from.value })"
+                  />
+                </div>
+                <div class="col-6">
+                  <label class="form-label small text-body-secondary mb-1" for="dateTo">По</label>
+                  <input
+                    #to
+                    id="dateTo"
+                    type="date"
+                    class="form-control form-control-sm"
+                    [class.is-invalid]="dateRangeInvalid()"
+                    [value]="draft().dateTo"
+                    [min]="draft().dateFrom"
+                    (change)="patchDraft({ dateTo: to.value })"
+                  />
+                </div>
+              </div>
+              @if (dateRangeInvalid()) {
+                <div class="small text-danger mt-1">Дата «с» позже даты «по»</div>
+              }
+            </fieldset>
+          </app-filter-hint>
+
+          <!-- Вес -->
+          <app-filter-hint [info]="filterInfo.weight" [current]="weightHintText()">
+            <fieldset class="date-box">
+              <legend class="small text-body-secondary mb-2">
+                <i class="bi bi-speedometer2 me-1"></i>Вес, т
+              </legend>
+              <div class="d-flex flex-wrap gap-1 mb-2">
+                @for (p of weightPresets; track p.label) {
+                  <button
+                    type="button"
+                    class="btn btn-sm preset"
+                    [class.btn-primary]="isWeightPresetActive(p)"
+                    [class.btn-outline-secondary]="!isWeightPresetActive(p)"
+                    (click)="applyWeightPreset(p)"
+                  >
+                    {{ p.label }}
+                  </button>
+                }
+              </div>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label small text-body-secondary mb-1" for="weightFrom"
+                    >От</label
+                  >
+                  <input
+                    #wFrom
+                    id="weightFrom"
+                    type="text"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    class="form-control form-control-sm"
+                    [class.is-invalid]="weightRangeInvalid()"
+                    [placeholder]="weightMin() | number: '1.0-1'"
+                    [value]="draft().weightFrom ?? ''"
+                    (input)="setWeight('weightFrom', wFrom.value)"
+                  />
+                </div>
+                <div class="col-6">
+                  <label class="form-label small text-body-secondary mb-1" for="weightTo">До</label>
+                  <input
+                    #wTo
+                    id="weightTo"
+                    type="text"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    class="form-control form-control-sm"
+                    [class.is-invalid]="weightRangeInvalid()"
+                    [placeholder]="weightMax() | number: '1.0-1'"
+                    [value]="draft().weightTo ?? ''"
+                    (input)="setWeight('weightTo', wTo.value)"
+                  />
+                </div>
+              </div>
+              @if (weightRangeInvalid()) {
+                <div class="small text-danger mt-1">Значение «от» больше, чем «до»</div>
+              }
+            </fieldset>
+          </app-filter-hint>
+        </div>
+
+        <!-- Применение -->
+        <div class="card-footer bg-body d-flex flex-column gap-2">
+          @if (isDirty()) {
+            <div class="small text-warning-emphasis d-flex align-items-center gap-1">
+              <i class="bi bi-exclamation-circle"></i>Фильтры изменены, но не применены
+            </div>
+          }
+          <div class="d-flex gap-2">
+            <button
+              type="submit"
+              class="btn btn-primary flex-grow-1"
+              [disabled]="!isDirty() || hasErrors() || loading()"
+            >
+              @if (loading()) {
+                <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+              } @else {
+                <i class="bi bi-check2 me-1"></i>
+              }
+              Применить
+            </button>
+            @if (isDirty()) {
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                title="Отменить изменения"
+                (click)="cancelDraft()"
+              >
+                <i class="bi bi-arrow-counterclockwise"></i>
+              </button>
+            }
+          </div>
+        </div>
+      </form>
+    </aside>
+
+    <!-- Таблица -->
+    <section class="col-12 col-lg-8 col-xl-9">
+      <div class="card shadow-sm">
+        <!-- Тулбар -->
+        <div class="card-header bg-body d-flex flex-wrap align-items-center gap-2">
+          <form
+            class="input-group input-group-sm search"
+            (submit)="$event.preventDefault(); apply()"
+          >
+            <span class="input-group-text bg-body"><i class="bi bi-search"></i></span>
+            <input
+              #q
+              type="search"
+              class="form-control"
+              placeholder="№ вагона, № контейнера или станция"
+              [value]="draft().search"
+              (input)="patchDraft({ search: q.value })"
+            />
+            <button
+              type="submit"
+              class="btn btn-outline-secondary"
+              [disabled]="!isDirty() || loading()"
+            >
+              Найти
+            </button>
+          </form>
+          <div class="ms-auto d-flex align-items-center gap-2">
+          <span class="small text-body-secondary text-nowrap">
+            @if (loading()) {
+              <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span
+              >Загрузка…
+            } @else {
+              Найдено: <b class="text-body">{{ rows().length | number }}</b>
+            }
+          </span>
+
+          <!-- Выгрузка в Excel: все строки по применённым фильтрам, видимые колонки -->
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1"
+            [disabled]="exporting() || loading() || !rows().length"
+            [title]="
+              isDirty()
+                ? 'Выгрузятся применённые фильтры. Есть неприменённые изменения — сначала нажмите «Применить»'
+                : 'Выгрузить ' + rows().length + ' строк в Excel (все страницы, видимые колонки)'
+            "
+            (click)="exportToExcel()"
+          >
+            @if (exporting()) {
+              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+            } @else {
+              <i class="bi bi-file-earmark-excel"></i>
+            }
+            <span class="d-none d-sm-inline">Excel</span>
+          </button>
+
+          <!-- Выбор видимых колонок -->
+          <div class="dropdown">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+              data-bs-toggle="dropdown"
+              data-bs-auto-close="outside"
+              aria-expanded="false"
+              title="Какие колонки показывать"
+            >
+              <i class="bi bi-layout-three-columns"></i>
+              <span class="d-none d-sm-inline">Колонки</span>
+              <span class="badge rounded-pill text-bg-secondary">
+                {{ visibleColumns().length }}/{{ columns.length }}
+              </span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end shadow columns-menu">
+              <div class="px-3 pt-1 pb-2 d-flex justify-content-between align-items-baseline gap-3">
+                <span class="fw-semibold small">Колонки таблицы</span>
+                <span class="small text-body-secondary text-nowrap">
+                  {{ visibleColumns().length }} из {{ columns.length }}
+                </span>
+              </div>
+              @for (col of columns; track col.key) {
+                <label class="dropdown-item columns-item" [class.disabled]="col.locked">
+                  <input
+                    type="checkbox"
+                    class="form-check-input mt-0"
+                    [checked]="!hiddenColumns().has(col.key)"
+                    [disabled]="col.locked"
+                    (change)="toggleColumn(col)"
+                  />
+                  <span class="flex-grow-1">{{ col.title === '#' ? '# (номер строки)' : col.title }}</span>
+                  @if (col.locked) {
+                    <i class="bi bi-lock text-body-secondary" title="Обязательная колонка"></i>
+                  }
+                </label>
+              }
+              <div class="dropdown-divider"></div>
+              <div class="px-3 pb-1">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-link p-0 text-decoration-none"
+                  [disabled]="!hiddenColumns().size"
+                  (click)="showAllColumns()"
+                >
+                  Показать все
+                </button>
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>
+
+        @if (exportError()) {
+          <div class="alert alert-danger d-flex align-items-center gap-2 rounded-0 border-0 border-bottom mb-0 py-2 small" role="alert">
+            <i class="bi bi-exclamation-triangle"></i>
+            Не удалось сформировать файл Excel. Попробуйте ещё раз.
+            <button type="button" class="btn-close btn-sm ms-auto" aria-label="Закрыть" (click)="exportError.set(false)"></button>
+          </div>
+        }
+
+        @if (savedNotice(); as n) {
+          <div class="alert alert-success d-flex align-items-center gap-2 rounded-0 border-0 border-bottom mb-0 py-2 small" role="status">
+            <i class="bi bi-check-circle"></i>
+            <span>
+              Изменения вагона № <b>{{ n.wagonNumber }}</b> сохранены.
+              @if (savedRowHidden()) {
+                <span class="text-body-secondary">Он больше не подходит под текущие фильтры и скрыт из таблицы.</span>
+              }
+            </span>
+            <a class="ms-auto link-success small" [routerLink]="['/wagons', n.id]">Открыть снова</a>
+            <button type="button" class="btn-close btn-sm" aria-label="Закрыть" (click)="dismissSavedNotice()"></button>
+          </div>
+        }
+
+        <!-- Активные (применённые) фильтры -->
+        @if (activeChips().length) {
+          <div
+            class="d-flex flex-wrap align-items-center gap-1 px-3 py-2 border-bottom bg-body-tertiary"
+          >
+            <span class="small text-body-secondary me-1">Активные фильтры:</span>
+            @for (c of activeChips(); track c.key) {
+              <span class="chip">
+                @if (c.color) {
+                  <span class="swatch" [style.background]="c.color"></span>
+                }
+                {{ c.label }}
+                <button
+                  type="button"
+                  class="chip-x"
+                  aria-label="Убрать"
+                  [disabled]="loading()"
+                  (click)="c.remove()"
+                >
+                  <i class="bi bi-x"></i>
+                </button>
+              </span>
+            }
+          </div>
+        }
+
+        <div class="table-wrap" [class.is-loading]="loading()" [attr.aria-busy]="loading()">
+          @if (loading()) {
+            <div class="loading-overlay">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Загрузка…</span>
+              </div>
+            </div>
+          }
+          <table class="table table-hover table-striped align-middle mb-0">
+            <thead>
+              <tr>
+                @for (col of visibleColumns(); track col.key) {
+                  <th
+                    scope="col"
+                    class="sortable"
+                    [class.text-end]="col.align === 'end'"
+                    [attr.aria-sort]="
+                      sortKey() === col.key
+                        ? sortDir() === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : null
+                    "
+                    (click)="sortBy(col.key)"
+                  >
+                    {{ col.title }}
+                    <i
+                      class="bi sort-icon"
+                      [class.bi-arrow-down-up]="sortKey() !== col.key"
+                      [class.bi-sort-up]="sortKey() === col.key && sortDir() === 'asc'"
+                      [class.bi-sort-down]="sortKey() === col.key && sortDir() === 'desc'"
+                      [class.active]="sortKey() === col.key"
+                    ></i>
+                  </th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (w of pageRows(); track w.id) {
+                <tr
+                  class="row-link"
+                  [class.row-edited]="lastEditedId() === w.id"
+                  [title]="'Открыть вагон № ' + w.wagonNumber + ' для редактирования'"
+                  (click)="openWagon(w)"
+                >
+                  @for (col of visibleColumns(); track col.key) {
+                    @switch (col.key) {
+                      @case ('id') {
+                        <td class="text-body-secondary">{{ w.id }}</td>
+                      }
+                      @case ('wagonNumber') {
+                        <td class="font-monospace">
+                          <!-- ссылка — чтобы открыть с клавиатуры или в новой вкладке -->
+                          <a class="wagon-link" [routerLink]="['/wagons', w.id]" (click)="$event.stopPropagation()">
+                            {{ w.wagonNumber }}
+                          </a>
+                        </td>
+                      }
+                      @case ('containerNumber') {
+                        <td class="font-monospace">{{ w.containerNumber }}</td>
+                      }
+                      @case ('status') {
+                        <td>
+                          <span class="d-inline-flex align-items-center gap-2">
+                            <span class="swatch" [style.background]="colorOf(w.colorId)?.color"></span>
+                            {{ colorOf(w.colorId)?.description }}
+                          </span>
+                        </td>
+                      }
+                      @case ('type') {
+                        <td>
+                          <span class="type-badge" [title]="nameOf(w.nameId)?.description ?? ''">
+                            {{ nameOf(w.nameId)?.name }}
+                          </span>
+                        </td>
+                      }
+                      @case ('owner') {
+                        <td class="owner-cell" [title]="ownerOf(w.ownerId)?.fullName ?? ''">
+                          {{ ownerOf(w.ownerId)?.shortName }}
+                        </td>
+                      }
+                      @case ('operator') {
+                        <td
+                          class="owner-cell"
+                          [title]="(operatorOf(w.operatorId)?.fullName ?? '') + ' · код ' + (operatorOf(w.operatorId)?.code ?? '')"
+                        >
+                          {{ operatorOf(w.operatorId)?.shortName }}
+                        </td>
+                      }
+                      @case ('station') {
+                        <td>{{ w.station }}</td>
+                      }
+                      @case ('weight') {
+                        <td class="text-end tabular">{{ w.weight | number: '1.1-1' }}</td>
+                      }
+                      @case ('arrivalDate') {
+                        <td class="tabular">{{ w.arrivalDate | date: 'dd.MM.yyyy HH:mm' }}</td>
+                      }
+                    }
+                  }
+                </tr>
+              } @empty {
+                <tr>
+                  <td [attr.colspan]="visibleColumns().length" class="text-center text-body-secondary py-5">
+                    @if (loading()) {
+                      <span class="d-block py-5"></span>
+                    } @else {
+                      <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                      Нет данных по выбранным фильтрам
+                    }
+                    @if (hasFilters() && !loading()) {
+                      <div>
+                        <button type="button" class="btn btn-sm btn-link" (click)="resetAll()">
+                          Сбросить фильтры
+                        </button>
+                      </div>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Пагинация -->
+        <div class="card-footer bg-body d-flex flex-wrap align-items-center gap-3 small">
+          <div class="d-flex align-items-center gap-2">
+            <span class="text-body-secondary">Строк на странице</span>
+            <select
+              #size
+              class="form-select form-select-sm w-auto"
+              (change)="setPageSize(size.value)"
+            >
+              @for (s of pageSizes; track s) {
+                <option [value]="s" [selected]="s === pageSize()">{{ s }}</option>
+              }
+            </select>
+          </div>
+          <span class="text-body-secondary">
+            {{ rangeFrom() | number }}–{{ rangeTo() | number }} из {{ rows().length | number }}
+          </span>
+          <nav class="ms-auto d-flex align-items-center gap-1" aria-label="Пагинация">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary"
+              [disabled]="currentPage() === 1"
+              (click)="goTo(1)"
+              aria-label="Первая"
+            >
+              <i class="bi bi-chevron-double-left"></i>
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary"
+              [disabled]="currentPage() === 1"
+              (click)="goTo(currentPage() - 1)"
+              aria-label="Назад"
+            >
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            <span class="px-2">
+              Стр.
+              <input
+                #p
+                type="number"
+                class="form-control form-control-sm d-inline-block page-input"
+                min="1"
+                [max]="totalPages()"
+                [value]="currentPage()"
+                (change)="goTo(+p.value)"
+              />
+              из {{ totalPages() }}
+            </span>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary"
+              [disabled]="currentPage() === totalPages()"
+              (click)="goTo(currentPage() + 1)"
+              aria-label="Вперёд"
+            >
+              <i class="bi bi-chevron-right"></i>
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary"
+              [disabled]="currentPage() === totalPages()"
+              (click)="goTo(totalPages())"
+              aria-label="Последняя"
+            >
+              <i class="bi bi-chevron-double-right"></i>
+            </button>
+          </nav>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>

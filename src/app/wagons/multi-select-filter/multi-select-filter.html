@@ -1,0 +1,145 @@
+<div class="ms" [class.inline]="mode() === 'inline'">
+  @if (info(); as i) {
+    <app-filter-hint [info]="i" [total]="options().length" [current]="selectionText()" [disabled]="open()">
+      <ng-container *ngTemplateOutlet="trigger" />
+    </app-filter-hint>
+  } @else {
+    <ng-container *ngTemplateOutlet="trigger" />
+  }
+
+  <ng-template #trigger>
+    <button
+      type="button"
+      class="ms-trigger"
+      [class.open]="open()"
+      [attr.aria-expanded]="open()"
+      (click)="toggleOpen()"
+    >
+      <i class="bi {{ icon() }} text-body-secondary"></i>
+      <span class="flex-grow-1 text-start">
+        <span class="d-block small text-body-secondary lh-sm">{{ title() }}</span>
+        <span class="d-block fw-medium text-truncate">
+          @switch (selectedOptions().length) {
+            @case (0) { Все }
+            @case (1) { {{ selectedOptions()[0].label }} }
+            @default { Выбрано: {{ selectedOptions().length }} из {{ options().length }} }
+          }
+        </span>
+      </span>
+      <i class="bi bi-chevron-down chevron"></i>
+    </button>
+  </ng-template>
+
+  <!-- Выбранные значения чипами -->
+  @if (selectedOptions().length) {
+    <div class="chips">
+      @for (o of selectedOptions().slice(0, 4); track o.id) {
+        <span class="chip" [title]="o.description">
+          @if (o.color) {
+            <span class="swatch" [style.background]="o.color"></span>
+          }
+          {{ o.label }}
+          <button type="button" class="chip-x" aria-label="Убрать" (click)="remove(o.id, $event)">
+            <i class="bi bi-x"></i>
+          </button>
+        </span>
+      }
+      @if (selectedOptions().length > 4) {
+        <button type="button" class="chip chip-more" (click)="showSelected()">
+          +{{ selectedOptions().length - 4 }}
+        </button>
+      }
+    </div>
+  }
+
+  @if (open()) {
+    <div class="ms-panel" [class.shadow]="mode() === 'overlay'" role="dialog" [attr.aria-label]="title()">
+      <div class="p-2 border-bottom">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-body"><i class="bi bi-search"></i></span>
+          <input
+            #search
+            type="search"
+            class="form-control"
+            [placeholder]="searchPlaceholder()"
+            [value]="query()"
+            (input)="query.set(search.value)"
+          />
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 small">
+          <div class="form-check form-switch mb-0">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              role="switch"
+              [id]="title() + '-only'"
+              [checked]="onlySelected()"
+              (change)="onlySelected.set(!onlySelected())"
+            />
+            <label class="form-check-label" [for]="title() + '-only'">Только выбранные</label>
+          </div>
+          <span class="text-body-secondary">Найдено: {{ filtered().length }}</span>
+        </div>
+      </div>
+
+      <ul class="ms-list list-unstyled mb-0">
+        @for (o of visible(); track o.id) {
+          <li>
+            <label class="ms-option" [class.active]="selectedSet().has(o.id)">
+              <input
+                type="checkbox"
+                class="form-check-input mt-0 flex-shrink-0"
+                [checked]="selectedSet().has(o.id)"
+                (change)="toggle(o.id)"
+              />
+              @if (o.color) {
+                <span class="swatch swatch-lg" [style.background]="o.color"></span>
+              }
+              <span class="flex-grow-1 min-w-0">
+                <span class="d-flex align-items-center gap-2">
+                  <span class="fw-medium text-truncate">{{ o.label }}</span>
+                  <span class="id-badge">#{{ o.id }}</span>
+                </span>
+                <span class="d-block small text-body-secondary option-desc">{{ o.description }}</span>
+                @if (o.details?.length) {
+                  <span class="option-details">
+                    @for (d of o.details; track d.label) {
+                      <span><span class="text-body-secondary">{{ d.label }}:</span> {{ d.value }}</span>
+                    }
+                  </span>
+                }
+              </span>
+              @if (o.count !== undefined) {
+                <span class="count">{{ o.count }}</span>
+              }
+            </label>
+          </li>
+        } @empty {
+          <li class="text-center text-body-secondary small py-4">Ничего не найдено</li>
+        }
+        @if (filtered().length > visible().length) {
+          <li class="text-center text-body-secondary small py-2">
+            Показаны первые {{ visible().length }} — уточните поиск
+          </li>
+        }
+      </ul>
+
+      <div class="d-flex justify-content-between p-2 border-top bg-body-tertiary rounded-bottom">
+        <button type="button" class="btn btn-sm btn-link text-decoration-none" (click)="selectAllFiltered()">
+          Выбрать все найденные
+        </button>
+        <div class="d-flex gap-2">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            [disabled]="!selectedOptions().length"
+            (click)="clear()"
+          >
+            Очистить
+          </button>
+          <button type="button" class="btn btn-sm btn-primary" (click)="open.set(false)">Готово</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>
